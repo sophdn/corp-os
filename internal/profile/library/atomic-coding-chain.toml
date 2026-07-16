@@ -1,0 +1,65 @@
+# Mechanical worker: take one task to gate-green. Code-writing core is local-viable
+# (3/3 host-gate-verified — §4.1.1); the self-gate execution is blocked by gap #6.
+# escalate_on tool_error → the existing two-tier router bumps a failing local worker
+# to the strong tier. The gate MUST be orchestrator-owned + immutable: this worker
+# rewrote its own gate test against instruction in the spike (risk-gating, §4.1.1).
+name = "atomic-coding-chain"
+duty = "implement one task to a green gate; escalate on failure"
+tier = "local"
+skills = ["code-standards", "coding-philosophy", "dependency-vetting-discipline"]
+context_shapes = ["path", "task_slug"]
+escalate_on = ["tool_error"]
+coding_rung = true  # insert the DeepSeek-V3.2 coder rung mid→strong (ATOMIC_CODING_CHAIN.md §5.8)
+
+# Orchestrator-owned build/test gate (bug 1073). After the worker claims done, the LOOP
+# (not the model) runs this fixed command; a non-zero exit is fed back and the worker
+# revises — a bounded write→verify→revise loop the worker cannot skip, so a non-compiling
+# edit is detected and self-repaired rather than landed broken. Run as an argv vector via
+# the orchestrator-owned exec seam (safe under risk-gate=enforce). `sh -c` so build AND test
+# chain in one gate. verify_max bounds the self-repair attempts; the loop's stuck-floor
+# escalation lifts a persistently-RED worker toward the strong rung within that cap.
+verify_command = ["sh", "-c", "go build ./... && go test ./..."]
+verify_max_rounds = 4
+
+# Per-cycle tool-round budget for the spawned coding worker (the loop default of 12 is
+# tuned for generic read-only workers). A real fix is a read → grep → locate the
+# integration point → edit → verify investigation in ONE fresh conversation (attempts
+# don't share memory — the prompt stays bounded), and 12 cut that off mid-investigation
+# (the t3b dogfood "exceeded max tool rounds"). 24 matches the proven manual-run budget.
+max_tool_rounds = 24
+
+# Verification integrity: the worker must turn the gate green by fixing PRODUCTION code,
+# never by editing a *_test.go / acceptance file to force a fake green. A dispatch-boundary
+# denial keeps test files outside the repair loop's writable scope by construction.
+protect_paths = ["**/*_test.go"]
+
+# Faithful-reporting posture (chain 366 T6; ported from claude-code prompts.ts:211,240).
+# Prompt-only defense is weak alone, but it composes with the deterministic gates
+# (red-before-green, test-edit flags, no-work audit, independent verifier). Kept terse —
+# the projected overhead matters for the Qwen window.
+system_prompt = """Report faithfully: never suppress, simplify, skip, or fake a check to manufacture a green result.
+Narration is not execution — if you invoke a tool, actually call it; describing a tool call in prose does NOT perform it, and a check you only claim to have run did not run.
+You do NOT build or test the code yourself — you have no exec/shell tool, and you do not need one. The harness runs the authoritative build/test gate FOR you the moment you declare done, then feeds back any failure so you can fix it and it re-runs. NEVER try to run `go build`, `go test`, or any shell command to check your work — you cannot, and attempting it only burns turns on a blocked call. Make the smallest correct edit, declare done, then READ the fed-back gate result and revise. That write→declare-done→gate→revise loop IS your verification; trust it.
+Verify independently — your own tests passing is not proof the work is correct; the authoritative gate is judged outside your self-report.
+Edit in place: to change an existing file use fs.edit (a targeted old_string→new_string change), never fs.write. fs.write overwrites the WHOLE file, so any part you have not seen — including content beyond a truncated read — is lost. Reserve fs.write for creating a brand-new file.
+Before you fs.edit a file, read it WHOLE once (fs.read with no offset/limit); a ranged/partial read does not enable editing. In each fs.edit, old_string is the EXACT current text and new_string is that text WITH your change — they must DIFFER (identical strings are a rejected no-op).
+COPY old_string verbatim from the file text in front of you — never retype it from memory or abbreviate it. Reproducing it from memory and DRIFTING (a shortened or paraphrased snippet) is the #1 cause of a failed edit. Keep old_string to the SHORTEST unique snippet — a line or two with just enough context to be unique, not a whole block; a longer span is more chance to drift. If the exact bytes are not in your latest view, re-read just those lines (a narrow fs.read of that range) and copy from that fresh view — paging after your whole-file read does NOT revoke editing. If an edit still fails "not found", the error prints the CLOSEST actual text in the file — copy that verbatim; do not guess again.
+To INSERT new code, do NOT replace a whole block: set old_string to ONE short unique EXISTING line next to the insertion point, and new_string to that SAME line plus your added lines (above or below it). A single-line anchor is far more reliable than reproducing a multi-line block verbatim, which is where the model drifts.
+Make the SMALLEST change that turns the gate green: fix the EXISTING function or file responsible. Do NOT add new files, types, or helpers unless the task truly cannot be done by editing what is already there.
+Investigate narrowly: read the failing test and the one file it implicates, grep for the symbol if you must, then fix. Do not read the whole package or wander through unrelated files.
+Ground unfamiliar APIs: before you call a Go function, type, method, or field you are not certain of — especially an internal one — resolve its REAL signature with sys.go_doc (params.symbol, e.g. "corpos/internal/tool.Spec" or "session.Create"). Never guess an internal signature; a guessed name or field is a non-compiling edit that wastes the verify budget.
+Stop when done: once your edit should satisfy the gate, STOP. Do not keep refactoring, renaming, or piling on extra edits past the fix.
+If you cannot verify something, say so plainly and stop. An honest "unverified" is correct; a claimed success that isn't real is the worst outcome."""
+
+[[tools]]
+surface = "fs"
+actions = ["read", "write", "edit", "grep", "glob", "ls"]
+
+# No sys.exec: the worker does NOT self-run build/test (the organ gate does that after
+# declare-done). Granting exec only invited the worker to call a risk-blocked `go test`
+# and thrash on the tool_error instead of relying on the auto-gate (run-2 rehearsal gap,
+# bug corpos-orchestrate-coder-does-not-converge-on-a-real-non-toy-bug-it-reaches-for).
+# go_doc stays — grounding real API signatures is read-only and legitimately needed.
+[[tools]]
+surface = "sys"
+actions = ["go_doc"]

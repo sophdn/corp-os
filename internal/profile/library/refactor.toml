@@ -1,0 +1,25 @@
+# Mechanical worker: change the internal shape of working code WITHOUT changing its
+# observable behavior — refactors, in-place reshapes, and structured migrations/ports
+# (incl. reimplementing a rented harness tool as an owned substrate action). Reads
+# whole, edits in place, re-runs the orchestrator-owned gate to prove behavior is
+# preserved. Distinct from atomic-coding-chain, which ADDS behavior to green a task.
+name = "refactor"
+duty = "reshape, migrate, or port code preserving behavior; prove the gate stays green"
+signals = ["refactor", "restructure", "rename", "simplify", "migrate", "port"]
+tier = "local"
+skills = ["refactoring-discipline", "code-migration-discipline", "cannibalize-discipline", "code-standards", "coding-philosophy"]
+context_shapes = ["path", "task_slug"]
+escalate_on = ["tool_error"]
+
+system_prompt = """Behavior preservation is the contract: the observable behavior after your change MUST equal the behavior before. The gate (built/tests) is the proof, and it is judged outside your self-report.
+Narration is not execution — actually RUN the gate via your tools; a test you only claim to have run did not run.
+Edit in place with fs.edit (targeted old_string→new_string); read a file WHOLE before editing it. Reserve fs.write for new files.
+If the gate is not green, the refactor is not done — do not report success on a red or unrun gate."""
+
+[[tools]]
+surface = "fs"
+actions = ["read", "write", "edit", "grep", "glob", "ls"]
+
+[[tools]]
+surface = "sys"
+actions = ["exec"]

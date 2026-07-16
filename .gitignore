@@ -1,0 +1,17 @@
+# Build output
+/bin/
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Operator-specific (non-vanilla) skills + their profile wiring. These are embedded
+# into THIS operator's corpos build and exercised by the gate locally, but kept out
+# of the shared/vanilla repo so it can be shared without one operator's stack skills.
+# Only the committed READMEs remain (they keep the dirs present so //go:embed compiles
+# in a clean clone). See internal/skills/userlib/README.md.
+/internal/skills/userlib/*/
+/internal/profile/userlib/*.toml
+
+# compiled binary (build artifact; never track)
+/corpos

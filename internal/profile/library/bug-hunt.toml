@@ -1,0 +1,19 @@
+# Judgment worker: find runtime failures and FILE each as a bug (never fix inline).
+# Read-only on code + the bug-forge write door. Adversarial input-finding; files
+# every finding rather than fixing it inline.
+name = "bug-hunt"
+duty = "find runtime failures and file each as a bug; never fix inline"
+signals = ["hunt"]
+# A hunt that turns out to want an inline fix widens toward bug-fix rather than block.
+rescope_to = ["bug-fix"]
+tier = "mid" # default-capped at mid (2026-06-03 directive); tune to strong only if mid proves insufficient on real bug-hunt work
+skills = ["bug-filing-discipline", "systematic-debugging"]
+context_shapes = ["path", "bug_slug"]
+
+[[tools]]
+surface = "fs"
+actions = ["read", "grep", "glob", "ls"]
+
+[[tools]]
+surface = "work"
+actions = ["forge", "forge_schema", "bug_list", "bug_read"]

@@ -1,0 +1,37 @@
+$ corpos ... -risk-gate build-test -strong-bound 2 -max-spawns 4 -prompt "Build a small todo app: backend package 'todo' (in-memory store + net/http API, with tests) and a minimal static index.html + app.js frontend. Make 'go test ./...' pass."
+
+corpos: no profile signal matched the prompt → safe default "orchestrate"
+corpos: profile "orchestrate" (tier mid) — projected 4 of 6 surfaces
+corpos: model ladder OVERRIDDEN by flags — the canonical (benchmarked) ladder is Qwen2.5-32B-Instruct-Q4_K_M.gguf → google/gemini-3.1-flash-lite → claude-opus-4-8
+corpos: live coding path on — coding duties run through the operator-seat organ (target <repo>)
+corpos: orchestration on — "orchestrate" may spawn workers via agent.spawn
+corpos: session 01KWJA6RZG130CZ043PDZAAY1P (resume with -resume 01KWJA6RZG130CZ043PDZAAY1P)
+corpos: context compaction on by default — budget 124000 tok, fidelity extreme (model window 1000000, tool-spec overhead ~2306)
+corpos: model ladder — Qwen2.5-32B-Instruct-Q4_K_M.gguf → google/gemini-3.1-flash-lite → claude-opus-4-8; floor=google/gemini-3.1-flash-lite; escalation: full contract (repeated_tool_error after 1); opus bounded to 2 turn(s)
+  [tool fs.ls -> ok]
+  [tool agent.spawn -> ok]           # orchestrator delegates the build to a worker
+  [tool fs.ls -> ok]
+  [tool fs.read -> ok]
+  [tool fs.read -> ok]
+  [tool fs.read -> ok]
+  [tool fs.read -> ok]
+corpos: circuit-breaker: strong-bound reached — the frontier (claude-opus-4-8) served its 2 bounded turn(s) with the task still stuck; halting rather than spending unbounded frontier on a run the floor can't finish, no final answer
+
+corpos: session cost $0.1030
+  claude-opus-4-8: 15613 in + 821 out tok → $0.0986 [priced: table]
+  google/gemini-3.1-flash-lite: 15572 in + 329 out tok → $0.0044 [priced: provider]
+  opus bound: 2/2 turn(s) used, 0 escalation(s) blocked
+
+# WHAT IT PRODUCED (see produced/):
+#   index.html + app.js  — a REAL, working minimal frontend (add + list todos via fetch)
+#   todo_test.go         — the ENTIRE backend (Todo, Store, NewStore, net/http
+#                          handlers) written INSIDE the test file (package todo_test)
+#
+# So the frontend half landed as real files, but the backend went into a *_test.go —
+# hollow green again (nothing for the frontend to actually talk to), and corpos
+# halted "still stuck" rather than declare done. The multi-file feature is only
+# PARTIALLY delivered; clean convergence at this scale is the frontier.
+#
+# This is the most honest of the three: it shows the orchestration + spawn
+# machinery engaging a larger goal, delivering part of it for real, and the gate
+# refusing to bless an incomplete/hollow result. Cost: $0.10.

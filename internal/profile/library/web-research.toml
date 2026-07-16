@@ -1,0 +1,23 @@
+# Judgment worker: research a question against BOTH the live web and the owned
+# knowledge corpus. The first profile to declare the `web` surface — its existence
+# proves per-profile projection over the toolkit+web UNION (a web-needing worker
+# gets web; the mechanical leaves and the substrate-only judgment profiles do not).
+# Whole `web` surface (search + fetch) plus knowledge read (vault/kiwix/library) and
+# read-only fs. No write surface — the research findings are the deliverable.
+# Tier mid (default-capped 2026-06-03; web research is reasoning, not a leaf).
+name = "web-research"
+duty = "research a question against the live web and the owned knowledge corpus"
+signals = ["research", "web", "search", "investigate", "lookup"]
+tier = "mid"
+context_shapes = ["vault_note", "library", "kiwix"]
+
+[[tools]]
+surface = "web"
+
+[[tools]]
+surface = "knowledge"
+actions = ["vault_search", "vault_read", "kiwix_search", "kiwix_fetch", "knowledge_search", "library_find", "library_get"]
+
+[[tools]]
+surface = "fs"
+actions = ["read", "grep", "glob", "ls"]

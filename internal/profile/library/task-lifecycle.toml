@@ -1,0 +1,21 @@
+# Mechanical leaf worker: move chains/tasks/bugs through their lifecycle on the
+# work ledger. No forge/roadmap/trained_model — lifecycle transitions + record
+# only (§4.1, §4.4.2). Local-viable (5/5, ledger-verified — §4.1.1).
+name = "task-lifecycle"
+duty = "transition chains, tasks, and bugs through their lifecycle on the work ledger"
+signals = ["task", "chain", "ledger", "roadmap"]
+tier = "local"
+skills = ["scratchpad-discipline"]
+context_shapes = ["chain_slug", "task_slug", "bug_slug"]
+
+[[tools]]
+surface = "work"
+actions = [
+  "work_actions",
+  "chain_status", "chain_state", "chain_find", "chain_close",
+  "task_read", "task_list", "task_search", "task_start", "task_complete",
+  "task_cancel", "task_reopen", "task_unstart", "task_block", "task_unblock",
+  "task_blockers", "task_edit", "task_stamp_sha",
+  "bug_list", "bug_read", "bug_resolve", "bug_reopen", "bug_stamp_sha",
+  "record", "lifecycle_step", "emit_commit_landed",
+]

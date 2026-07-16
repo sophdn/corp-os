@@ -1,0 +1,42 @@
+# Corp-OS lint config (golangci-lint v1.62.2). Dialed up from commit 1.
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck      # unchecked errors
+    - govet         # vet
+    - ineffassign   # unused assignments
+    - staticcheck   # staticcheck suite
+    - unused        # unused code
+    # NB: gofmt/goimports are intentionally NOT enabled here. golangci-lint
+    # v1.62.2 bundles an older gofmt than the Go 1.26.3 toolchain, and the two
+    # disagree on formatting. The gate's stage 1 runs the *toolchain* `gofmt -s`
+    # as the single formatting authority; letting golangci arbitrate formatting
+    # with a stale bundled gofmt is redundant and conflicting. Revisit if we
+    # bump golangci-lint to a release built against Go 1.26.
+    - misspell      # typos
+    - revive        # style + exported-doc discipline
+    - errorlint     # error wrapping correctness
+    - unconvert     # redundant conversions
+    - gocritic      # opinionated checks
+    - bodyclose     # unclosed http bodies
+    - nilerr        # returning nil after a non-nil err
+    - wastedassign  # wasted assignments
+
+linters-settings:
+  revive:
+    rules:
+      - name: exported
+        disabled: false
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  # demos/ holds curated example OUTPUT (what the coding agent produced) for the
+  # public mirror — illustrative artifacts, not maintained corpos source, so they
+  # are not held to the repo's lint bar. Build/vet/test still cover them.
+  exclude-dirs:
+    - demos

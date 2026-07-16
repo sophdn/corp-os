@@ -1,0 +1,20 @@
+# Judgment worker: find correctness/hygiene issues. Read-only on code; offloads
+# the discrete severity label to the local Qwen rubric (measure.classify_*) to
+# shave frontier tokens (§4.4.3). Findings ARE the output — it never fixes or files.
+name = "code-review"
+duty = "find correctness and hygiene issues; rank by severity; never fix or file"
+signals = ["review", "audit", "critique", "diff"]
+# A task classified "review" that actually needs to edit + verify a fix recovers by
+# widening toward bug-fix (gains fs.write/edit + sys.exec) instead of hard-blocking.
+rescope_to = ["bug-fix"]
+tier = "mid" # default-capped at mid (2026-06-03 directive); tune to strong only if mid proves insufficient on real review work
+skills = ["code-standards", "requesting-code-review"]
+context_shapes = ["path", "skill"]
+
+[[tools]]
+surface = "fs"
+actions = ["read", "grep", "glob", "ls"]
+
+[[tools]]
+surface = "measure"
+actions = ["classify_audit_finding_severity", "classify_artifact_review_criterion", "classify_bug_severity"]

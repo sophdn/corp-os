@@ -1,0 +1,26 @@
+# Independent read-only verifier (chain 366 T5). After the coding worker claims done, a
+# SEPARATE corpos sub-run on THIS profile re-runs the principal-owned gate and reports a
+# verdict — "the implementer is an LLM; verify independently" (claude-code verificationAgent).
+# Mutating surfaces are STRIPPED: the scope grants fs READ-ONLY (read/grep/glob/ls) and
+# sys.exec (to RUN the gate, auto-approved to build/test/inspection by the build-test risk
+# gate) but NOT fs write/edit/move/remove — so the verifier physically cannot edit the code
+# or the tests it is checking. The scope is enforced at the dispatch boundary by the scoped
+# provider (bug 1044), so an out-of-scope mutating call is denied, not merely hidden.
+#
+# The verifier MUST emit `VERDICT: PASS|FAIL` plus a fenced command-block of the REAL
+# captured gate output. A PASS without a command-block is rejected by the orchestrator
+# ("a check without a run block is not a PASS — it's a skip"); the orchestrator also
+# spot-checks by re-running >=1 gate command itself.
+name = "atomic-coding-verifier"
+duty = "independently re-run the principal-owned gate on the worktree and report VERDICT: PASS|FAIL with a fenced command-block of the real captured output; reading code is not verification — run the command; never edit code or tests"
+tier = "local"
+skills = ["coding-philosophy"]
+context_shapes = ["path"]
+
+[[tools]]
+surface = "fs"
+actions = ["read", "grep", "glob", "ls"]
+
+[[tools]]
+surface = "sys"
+actions = ["exec"]

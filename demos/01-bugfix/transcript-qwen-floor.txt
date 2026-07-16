@@ -1,0 +1,85 @@
+corpos — demo 01 (bug-fix) — LOCAL QWEN FLOOR, clean green at $0.00
+====================================================================
+
+This is a real, captured run: the local Qwen2.5-32B worker (served by
+llama-server on :8081) takes the failing calc bug to clean green on its own —
+single-tier, no escalation to a paid rung — for $0.00. The paired flat all-Opus
+run of the identical task is shown at the bottom for cost comparison.
+
+Nothing here is hand-edited. The scenario is the ./scenario repo in this
+directory (a calc package whose Add returns a-b), copied to an isolated git repo
+so the worker's filesystem root and the verify-dir are the same tree.
+
+Invocation
+----------
+  corpos -profile atomic-coding-chain -timeout 600s \
+    -provider openai -model-url http://localhost:8081/v1 \
+        -model Qwen2.5-32B-Instruct-Q4_K_M.gguf \
+    -mid-provider "" -strong-provider "" \        # single-tier: local Qwen only
+    -mcp-url http://localhost:3005 -project scratch -verify-dir . \
+    -risk-gate build-test \
+    -prompt "The Go test in the ./calc package is failing. Find and fix the bug
+             in ./calc/calc.go so that 'go test ./calc/' passes. Do not modify
+             the test file."
+
+  (run from INSIDE the scenario repo, so the worker's fs surface and -verify-dir
+   are the same tree — see NOTE below.)
+
+corpos startup
+--------------
+corpos: profile "atomic-coding-chain" (tier local) — projected 2 of 6 surfaces
+corpos: model ladder — Qwen2.5-32B-Instruct-Q4_K_M.gguf (single-tier, no escalation)
+corpos: context compaction on by default — budget 6144 tok, fidelity low (model window 8192)
+
+Tool trace (what the worker actually did)
+-----------------------------------------
+  [tool sys.exec -> tool_error]   # first `go test` attempt — observed red
+  [tool sys.exec -> ok]           # re-ran the test, read the failure
+  [tool fs.read  -> ok]           # read calc/calc.go
+  [tool fs.edit  -> ok]           # applied the one-line fix
+  [tool sys.exec -> ok]           # `go test ./calc/` — GREEN, verified by the risk gate
+
+The fix the worker made
+-----------------------
+  --- a/calc/calc.go
+  +++ b/calc/calc.go
+  @@ func Add(a, b int) int {
+  -	return a - b // BUG: should be a + b
+  +	return a + b // BUG: should be a + b
+
+Worker's final answer
+---------------------
+  The test `go test ./calc/` now passes, indicating that the bug in the `Add`
+  function has been successfully fixed. The gate should now be green.
+
+Verification
+------------
+  $ go test ./calc/
+  ok  	bugfixdemo/calc
+
+Cost
+----
+corpos: session cost $0.0000
+  Qwen2.5-32B-Instruct-Q4_K_M.gguf: 17685 in (16920 cached) + 663 out tok → $0.0000 [free, local]
+
+====================================================================
+Baseline: the SAME task, flat all-Opus (single-tier claude-opus-4-8)
+====================================================================
+  Result:  clean green (identical outcome)
+  Tools:   fs.read, fs.glob, fs.read, fs.edit, sys.exec(err), sys.exec(ok)
+  Cost:    session cost $0.5125
+    claude-opus-4-8: 98400 in + 820 out tok → $0.5125 [priced: table]
+
+Cost per task, same fix, same clean-green result:
+  local Qwen floor:  $0.0000
+  flat all-Opus:     $0.5125
+
+The cheapest capable rung carried the mechanical fix for free; routing the
+identical task to the frontier model would have cost $0.51. That delta, summed
+over a workload of mechanical tasks, is the routing thesis.
+
+NOTE (a real gotcha, worth stating): corpos's fs surface operates on the
+process's working directory, while -verify-dir scopes the build-test gate. If
+you pass -verify-dir X but run corpos from a different directory, the worker
+edits one tree while the gate verifies another and the run can never converge.
+Run corpos from inside the repo you point -verify-dir at.

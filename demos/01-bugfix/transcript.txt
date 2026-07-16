@@ -1,0 +1,35 @@
+$ corpos ... -risk-gate build-test -strong-bound 2 -prompt "fix the failing test in ./calc ..."
+
+corpos: auto-selected "bug-fix" (score 4): signals=[fix bug] shapes=[]
+corpos: profile "bug-fix" (tier mid) — projected 3 of 6 surfaces
+corpos: model ladder OVERRIDDEN by flags — the canonical (benchmarked) ladder is Qwen2.5-32B-Instruct-Q4_K_M.gguf → google/gemini-3.1-flash-lite → claude-opus-4-8
+corpos: session 01KWJ6PR0DBHQB1NSGFK2WD336 (resume with -resume 01KWJ6PR0DBHQB1NSGFK2WD336)
+corpos: context compaction on by default — budget 124000 tok, fidelity extreme (model window 1000000, tool-spec overhead ~627)
+corpos: model ladder — Qwen2.5-32B-Instruct-Q4_K_M.gguf → google/gemini-3.1-flash-lite → claude-opus-4-8; floor=google/gemini-3.1-flash-lite; escalation: full contract (repeated_tool_error after 1); opus bounded to 2 turn(s)
+  [tool fs.ls -> ok]
+  [tool sys.exec -> ok]                # go test runs now: RED (Add(2,3) = -1, want 5)
+  [tool fs.read -> ok]
+  [tool fs.edit -> usage_error]        # cheap floor fumbles the edit-tool format (tracked gap)
+  [tool fs.edit -> ok]
+  [tool sys.exec -> ok]                # go test again
+  [tool fs.read -> ok]
+  [tool fs.edit -> ok]
+  [tool fs.read -> ok]
+  [tool fs.edit -> ok]
+  [tool fs.read -> ok]
+  [tool fs.write -> usage_error]
+  [tool fs.write -> ok]
+  [tool sys.exec -> ok]                # final `go test ./calc/` PASSES (repo is GREEN)
+corpos: circuit-breaker: strong-bound reached — the frontier (claude-opus-4-8) served its 2 bounded turn(s) with the task still stuck; halting rather than spending unbounded frontier on a run the floor can't finish, no final answer
+
+corpos: session cost $0.0666
+  claude-opus-4-8: 10312 in + 297 out tok → $0.0590 [priced: table]
+  google/gemini-3.1-flash-lite: 26895 in + 575 out tok → $0.0076 [priced: provider]
+  opus bound: 2/2 turn(s) used, 0 escalation(s) blocked
+
+# OUTCOME: the bug IS fixed — calc.go ends as `return a + b` and `go test ./calc/`
+# passes. But note the seam: the cheap floor's edit-tool `usage_error`s tripped
+# escalation, and the run halted on the frontier-usage bound reporting "still
+# stuck / no final answer" even though the repo is green. The FIX is correct; the
+# clean TERMINATION is the unreliable part — the cheap-tier convergence frontier
+# the top-level README names, and a tracked false-negative-verdict gap.

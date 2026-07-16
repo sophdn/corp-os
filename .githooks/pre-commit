@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Corp-OS pre-commit hook. Wired via: git config core.hooksPath .githooks
+#
+# Two responsibilities, in order:
+#   1. Worktree-discipline guard (PRESERVED) — refuse a commit on a non-main
+#      branch in the MAIN checkout; linked worktrees are detected + skipped.
+#      See skill: worktree-workflow.
+#   2. The FAST gate tier (format/vet/lint/build) via corpos-gate — the chain-434
+#      dogfood cutover from scripts/gate.sh. The SLOW stages (race suite,
+#      coverage floor, vuln, podman image) run at pre-push (.githooks/pre-push).
+#
+# gate.sh is retained as the standalone/CI-equivalent fallback; corpos-gate is
+# now the hook driver. Bypass BOTH stages with: git commit --no-verify
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+
+# 1. Worktree discipline: refuse a commit on a non-main branch in the MAIN
+#    checkout (set -e above makes a guard failure block the commit).
+"$ROOT/scripts/guard-worktree-discipline.sh"
+
+# 2. Fast gate tier. corpos-gate is installed to ~/go/bin (via
+#    `make -C go corpos-gate-install` from the corpos-toolkit checkout); add it
+#    to PATH so the hook fires under a bare git environment.
+export PATH="$PATH:$HOME/go/bin"
+if ! command -v corpos-gate >/dev/null 2>&1; then
+  echo "pre-commit: corpos-gate not found on PATH." >&2
+  echo "            install it from the corpos-toolkit checkout: make -C go corpos-gate-install" >&2
+  echo "            or bypass with: git commit --no-verify" >&2
+  exit 1
+fi
+
+exec corpos-gate run --tier=pre-commit

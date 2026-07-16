@@ -1,0 +1,78 @@
+# Gitea Actions CI for corpos — runs the same gate as the local pre-commit hook
+# (scripts/gate.sh) on every push and pull request, so "can't launch broken
+# code" holds in CI too, not just at commit time.
+#
+# Notes on the runner (node:22-bookworm):
+#   - Go is installed by actions/setup-go from go.mod's toolchain directive
+#     (go1.26.4 — 1.26.3 trips two stdlib govulncheck findings, so the toolchain
+#     line, not the `go` line, is what must win; auto-toolchain handles it).
+#   - gcc ships in the image, which `go test -race` needs (the build itself is
+#     CGO-free, but the race detector forces cgo).
+#   - ripgrep is installed for any fs-organ glob/grep handler that shells out to
+#     `rg` (mirrors the corpos-toolkit gate's dependency; harmless if unused).
+#   - the podman image stage (gate 7/7) is skipped — no podman on the runner;
+#     CORPOS_GATE_SKIP_IMAGE=1 leaves the other six stages fully enforced.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The runner mounts the workspace host-owned; gate.sh calls git
+      # rev-parse, so mark the tree safe. Also set a committer identity: the
+      # internal/coding suite drives the production `git commit` path, which
+      # relies on an ambient git user (present locally via ~/.gitconfig, absent
+      # on the fresh runner → `git commit` exits 128).
+      - name: trust the checkout + set a CI committer identity
+        run: |
+          git config --global --add safe.directory '*'
+          git config --global user.email 'ci@corpos.local'
+          git config --global user.name 'corpos ci'
+
+      - name: install ripgrep (fs-organ glob/grep handlers shell out to rg)
+        run: apt-get update && apt-get install -y --no-install-recommends ripgrep
+
+      - name: install go toolchain (version from go.mod)
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: run the gate (image stage skipped — no podman on the runner)
+        run: CORPOS_GATE_SKIP_IMAGE=1 ./scripts/gate.sh
+
+  # ── mirror-publish (chain 438) ─────────────────────────────────────────────
+  # Publish a scrubbed, squashed snapshot of main to the public GitHub mirror
+  # (github.com/sophdn/corp-os) on every green push to main. Gated on the green
+  # gate job and main-only. Content genericization is Option B: the private repo
+  # keeps real infra strings; publish-public.sh applies .publish-scrub-map and
+  # fail-closed-verifies against .pii-denylist before the tree is committed.
+  mirror-publish:
+    needs: [gate]
+    if: gitea.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: trust the checkout (git safe.directory)
+        run: git config --global --add safe.directory '*'
+
+      - name: Scrub, secret-scan, force-push public mirror
+        env:
+          MIRROR_TOKEN: ${{ secrets.MIRROR_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          OUT="$(mktemp -d)/mirror"
+          bash scripts/publish-public.sh --repo . --out "$OUT"   # scrub HEAD → squashed tree
+          bash scripts/secret-scan-tree.sh "$OUT"                # fail-closed: abort if any secret
+          git -C "$OUT" push --force \
+            "https://x-access-token:${MIRROR_TOKEN}@github.com/sophdn/corp-os.git" \
+            HEAD:main

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Corp-OS pre-push hook. Wired via: git config core.hooksPath .githooks
+#
+# Runs the SLOW gate tier via corpos-gate (chain-434 dogfood cutover). Because
+# tiers are a strict superset (pre-push ⊃ pre-commit), this re-runs the fast
+# checks (format/vet/lint/build) AND adds the slow ones:
+#   - test      : go test -race ./...            (gate.sh stage 6a)
+#   - coverage  : 95% floor over ./internal/...  (gate.sh stage 6b)
+#   - vuln      : govulncheck v1.3.0 ./...        (gate.sh stage 4)
+#   - image-smoke: podman build + distroless smoke (gate.sh stage 7)
+#
+# image-smoke honors CORPOS_GATE_SKIP_IMAGE=1 to skip on boxes/CI without
+# podman. Bypass the whole hook with: git push --no-verify
+set -euo pipefail
+
+# corpos-gate is installed to ~/go/bin (via `make -C go corpos-gate-install`
+# from the corpos-toolkit checkout); add it to PATH so the hook fires under a
+# bare git environment.
+export PATH="$PATH:$HOME/go/bin"
+if ! command -v corpos-gate >/dev/null 2>&1; then
+  echo "pre-push: corpos-gate not found on PATH." >&2
+  echo "          install it from the corpos-toolkit checkout: make -C go corpos-gate-install" >&2
+  echo "          or bypass with: git push --no-verify" >&2
+  exit 1
+fi
+
+exec corpos-gate run --tier=pre-push

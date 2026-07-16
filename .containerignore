@@ -1,0 +1,22 @@
+# Keep the build context minimal: only go.mod/go.sum + the Go source are build
+# inputs. Everything below is either VCS state, build/test output, docs, or the
+# packaging files themselves — none are needed inside the builder.
+.git
+.githooks
+.gitignore
+.golangci.yml
+
+# Build / test artifacts
+bin/
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Docs + packaging (not build inputs)
+README.md
+CLAUDE.md
+scripts/
+deploy/
+Containerfile
+.containerignore

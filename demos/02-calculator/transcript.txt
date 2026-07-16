@@ -1,0 +1,39 @@
+$ corpos ... -risk-gate build-test -strong-bound 4 -prompt "Create a Go package 'calc' with Add/Sub/Mul/Div (Div errors on divide-by-zero), a table-driven test, and an implementation that passes 'go test ./calc/'."
+
+corpos: no profile signal matched the prompt → safe default "orchestrate"
+corpos: profile "orchestrate" (tier mid) — projected 4 of 6 surfaces
+corpos: model ladder OVERRIDDEN by flags — the canonical (benchmarked) ladder is Qwen2.5-32B-Instruct-Q4_K_M.gguf → google/gemini-3.1-flash-lite → claude-opus-4-8
+corpos: live coding path on — coding duties run through the operator-seat organ (target <repo>)
+corpos: orchestration on — "orchestrate" may spawn workers via agent.spawn
+corpos: session 01KWJ9TNMECMATAN35ANFB5ZVG (resume with -resume 01KWJ9TNMECMATAN35ANFB5ZVG)
+corpos: context compaction on by default — budget 124000 tok, fidelity extreme (model window 1000000, tool-spec overhead ~2306)
+corpos: model ladder — Qwen2.5-32B-Instruct-Q4_K_M.gguf → google/gemini-3.1-flash-lite → claude-opus-4-8; floor=google/gemini-3.1-flash-lite; escalation: full contract (repeated_tool_error after 1); opus bounded to 4 turn(s)
+  [tool agent. -> tool_error]        # a malformed tool name, recovered
+  [tool agent.spawn -> ok]           # orchestrator delegates to a scoped worker
+  [tool fs.ls -> ok]
+  [tool fs.read -> ok]
+  [tool agent.spawn -> ok]           # sub-orchestration: another worker
+  [tool fs.ls -> ok]
+  [tool agent.spawn -> ok]
+corpos: circuit-breaker: strong-bound reached — the frontier (claude-opus-4-8) served its 4 bounded turn(s) with the task still stuck; halting rather than spending unbounded frontier on a run the floor can't finish, no final answer
+
+corpos: session cost $0.2055
+  claude-opus-4-8: 31321 in + 1781 out tok → $0.2011 [priced: table]
+  google/gemini-3.1-flash-lite: 15157 in + 354 out tok → $0.0043 [priced: provider]
+  opus bound: 4/4 turn(s) used, 0 escalation(s) blocked
+
+# WHAT HAPPENED: the "orchestrate" profile engaged sub-orchestration (agent.spawn)
+# and delegated the coding to scoped workers. A worker produced correct logic —
+# Add/Sub/Mul/Div with a divide-by-zero error and a full table-driven test — and
+# `go test ./calc/` PASSES.
+#
+# BUT the worker put the implementation INSIDE calc_test.go (see produced.go),
+# so the ONLY file changed is a *_test.go file. `go test` is green, yet a real
+# consumer importing the package gets nothing — the functions live in test-only
+# build scope. That is exactly the "hollow green / test-only diff" pattern
+# corpos's anti-fake-green gate exists to reject, and corpos did NOT declare
+# done — it halted "still stuck" rather than accept a test-file-only green.
+#
+# THE GAP: it should then recover to a proper calc.go, but it thrashed through
+# the strong-bound instead (the cheap-tier convergence frontier). The gate's
+# refusal is correct; the recovery is the unreliable part.

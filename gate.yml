@@ -1,0 +1,78 @@
+# gate.yml — corpos-gate declarative config for corpos.
+#
+# PARITY-FIRST / ADDITIVE: this mirrors scripts/gate.sh (the hand-rolled
+# "can't launch broken code" entrypoint) check-for-check, re-expressed on the
+# stack-agnostic corpos-gate orchestrator. It is a STOPGAP dogfood cutover for
+# chain 434 — once verified green and wired into .githooks, corpos-gate
+# SUPERSEDES the inline gate.sh stages as the gate driver (gate.sh is retained
+# as the documented fallback / CI-equivalent until the chain closes it out).
+#
+# Tier model: a strict superset — ci ⊃ pre-push ⊃ pre-commit. Fast checks run
+# at commit; slow checks (the -race suite, the coverage floor, the vuln scan,
+# the podman image build) run at push. `run --tier=pre-push` runs BOTH tiers,
+# so nothing gate.sh enforced is dropped — the slow stages simply move from
+# every commit to push time.
+#
+# Parity mapping to scripts/gate.sh (7 stages):
+#   1/7 gofmt -s drift (whole tree)  -> check `format`   (pre-commit)
+#   2/7 go vet ./...                 -> check `vet`      (pre-commit)
+#   3/7 golangci-lint v1.62.2 run    -> check `lint`     (pre-commit)  [golangci-lint on PATH is v1.62.2]
+#   5/7 go build ./...               -> check `build`    (pre-commit)
+#   6a/7 go test -race ./...         -> check `test` (race:true)       (pre-push)
+#   6b/7 coverage floor 95% over     -> check `coverage` floor:95      (pre-push)
+#        ./internal/...                       scope: ./internal/...
+#   4/7 govulncheck v1.3.0 ./...     -> check `vuln` (govulncheck_version) (pre-push) [see NOTE]
+#   7/7 podman image build + smoke   -> custom `image-smoke` (pre-push, honors CORPOS_GATE_SKIP_IMAGE)
+#
+# Like gate.sh, the suite is intentionally double-run at push: `test` runs the
+# race detector over ./..., then `coverage` runs the (non-race) cover-floor over
+# ./internal/... — exactly gate.sh stage 6's two invocations.
+#
+# NOTE (vuln): `go tool govulncheck` needs a go.mod tool directive, which this
+# repo's dependency-free go.mod (dev tools via `go run <tool>@<ver>` — a hard
+# invariant) doesn't carry. So the vuln check sets `govulncheck_version: v1.3.0`,
+# making corpos-gate run govulncheck via `go run …@v1.3.0`: no go.mod entry,
+# exact @v1.3.0 pin, invariant preserved.
+#
+# Prereq: corpos-gate must be on PATH. Bypass a blocked commit/push with
+# `git commit --no-verify` / `git push --no-verify`.
+stack: go
+
+units:
+  # go.mod is at the repo root; the unit dir is the repo root. No build tags.
+  - dir: "."
+
+checks:
+  format:   { enabled: true,  tier: pre-commit }
+  vet:      { enabled: true,  tier: pre-commit }
+  lint:     { enabled: true,  tier: pre-commit }
+  build:    { enabled: true,  tier: pre-commit }
+  # test: `go test -race ./...` (gate.sh 6a). race:true opts the suite into the
+  # race detector; scope is the whole tree ./... (not the coverage scope).
+  test:     { enabled: true,  tier: pre-push, race: true }
+  # coverage: gate.sh 6b — the 95% floor measured over the LOGIC packages only
+  # (./internal/...); cmd/ entrypoints are thin wrappers, integration-tested,
+  # not unit-covered. No race here (matches gate.sh's non-race cover run).
+  coverage: { enabled: true,  tier: pre-push, floor: 95, scope: "./internal/..." }
+  # vuln: govulncheck @v1.3.0 over the whole module, via corpos-gate's built-in
+  # go-run fallback (govulncheck_version) — needs no go.mod tool directive, so
+  # the dependency-free go.mod invariant is preserved.
+  vuln:     { enabled: true,  tier: pre-push, govulncheck_version: v1.3.0 }
+  # mutation: not part of gate.sh; left off.
+  mutation: { enabled: false, tier: ci }
+
+custom:
+  # image-smoke (gate.sh stage 7): rootless-podman image build + distroless
+  # smoke, via scripts/build-image.sh. Honors CORPOS_GATE_SKIP_IMAGE (=1/true/yes
+  # skips) so boxes/CI without podman — or a fast local verify — can opt out
+  # while every other stage still runs. build-image.sh itself hard-fails if
+  # podman is absent and the skip is unset, matching gate.sh stage 7.
+  - name: image-smoke
+    cmd: "bash -c 'case \"${CORPOS_GATE_SKIP_IMAGE:-}\" in 1|true|yes) echo skip-image; exit 0;; esac; exec scripts/build-image.sh'"
+    tier: pre-push
+  # pii-scan: block secrets (private keys / provider tokens) and project PII
+  # (.pii-denylist) from entering the repo; scans staged-added lines only, waive
+  # a false positive with an inline `pii-allow` marker. Fast -> pre-commit.
+  - name: pii-scan
+    cmd: "bash scripts/pii-scan.sh"
+    tier: pre-commit

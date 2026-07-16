@@ -1,0 +1,20 @@
+# Mechanical worker: land a vault note / memory / retro. Filing IS its lifecycle,
+# so it carries the write door (record + forge) scoped to filing — plus read.
+# Local-viable (2/2, incl. the finicky nested record(memory) first-try — §4.1.1).
+name = "doc-filing"
+duty = "file a vault note, memory entry, or retro on the owned organs"
+signals = ["document", "note", "retro", "changelog"]
+# A filing task that also needs to move a chain/task/bug through its lifecycle widens
+# toward task-lifecycle (gains the work-ledger transition actions).
+rescope_to = ["task-lifecycle"]
+tier = "local"
+skills = ["vault-filing-discipline", "bug-filing-discipline", "vault-pull-discipline", "suggestion-filing-discipline"]
+context_shapes = ["vault_note", "memory", "bug_slug"]
+
+[[tools]]
+surface = "work"
+actions = ["record", "forge", "forge_schema", "forge_schemas"]
+
+[[tools]]
+surface = "fs"
+actions = ["read"]

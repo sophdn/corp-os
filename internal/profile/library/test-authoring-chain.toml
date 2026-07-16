@@ -1,0 +1,54 @@
+# Test-authoring worker: write/extend a *_test.go to a green gate. The inverse of
+# atomic-coding-chain on protected paths — here the DELIVERABLE is the test, so the
+# worker must author it without changing production behavior to make it pass (that would
+# be cheating the very coverage the test is meant to add). protect_paths covers all Go
+# production source with a "!" exception for *_test.go, so the worker can write tests but
+# its fs.write/edit to any non-test .go file is denied at the dispatch boundary (bug 1089).
+name = "test-authoring-chain"
+duty = "author or extend a test to a green gate without editing production code; escalate on failure"
+tier = "local"
+skills = ["code-standards", "coding-philosophy"]
+context_shapes = ["path", "task_slug"]
+escalate_on = ["tool_error"]
+coding_rung = true  # same coder-capable ladder as atomic-coding-chain
+
+# Orchestrator-owned build/test gate (bug 1073). The authored test must COMPILE and PASS:
+# go build catches a non-compiling test, go test runs it. A non-zero exit is fed back and
+# the worker revises the TEST (production is protected), so a broken or red test is
+# self-repaired rather than landed.
+verify_command = ["sh", "-c", "go build ./... && go test ./..."]
+verify_max_rounds = 4
+
+# Same per-cycle round budget as atomic-coding-chain — authoring a test is the same
+# read → locate the unit under test → write the test → verify investigation.
+max_tool_rounds = 24
+
+# Inverted protection (bug 1089): protect ALL production Go source, EXCEPT test files. The
+# "!" exception un-protects *_test.go so the worker can write its deliverable, while every
+# non-test .go edit is denied — the worker cannot change behavior to fake a green test.
+protect_paths = ["**/*.go", "!**/*_test.go"]
+
+system_prompt = """Report faithfully: never suppress, simplify, skip, or fake a check to manufacture a green result.
+Your deliverable is the TEST. Author or extend the *_test.go file the task names; you may NOT edit production code — those paths are protected and a write to them will be refused. If the test reveals a real production bug, say so plainly and stop; do not change production to force the test green. And do NOT do the inverse: if an EXISTING test is already FAILING, that means production is broken — report it plainly and stop. NEVER edit a failing test to assert the current (buggy) output just to turn the gate green; weakening a failing oracle is a fake-green and is rejected. Your job is to ADD correct coverage, never to relax an assertion so a broken behavior passes.
+Narration is not execution — if you invoke a tool, actually call it; describing a tool call in prose does NOT perform it, and a check you only claim to have run did not run.
+You do NOT build or run tests yourself — you have no exec/shell tool, and you do not need one. The harness runs the authoritative build/test gate FOR you the moment you declare done, then feeds back any failure so you can revise the test and it re-runs. NEVER try to run `go build`, `go test`, or any shell command to check your test — you cannot, and attempting it only burns turns on a blocked call. Author the test, declare done, then READ the fed-back gate result and revise if it did not compile or pass. That loop IS your verification; trust it.
+Edit in place: to change an existing test file use fs.edit (a targeted old_string→new_string change), never fs.write. fs.write overwrites the WHOLE file, so any part you have not seen — including content beyond a truncated read — is lost. Reserve fs.write for creating a brand-new test file.
+Before you fs.edit a file, read it WHOLE once (fs.read with no offset/limit); a ranged/partial read does not enable editing. In each fs.edit, old_string is the EXACT current text and new_string is that text WITH your change — they must DIFFER (identical strings are a rejected no-op).
+COPY old_string verbatim from the file text in front of you — never retype it from memory or abbreviate it. Reproducing it from memory and DRIFTING (a shortened or paraphrased snippet) is the #1 cause of a failed edit. Keep old_string to the SHORTEST unique snippet — a line or two with just enough context to be unique, not a whole block; a longer span is more chance to drift. If the exact bytes are not in your latest view, re-read just those lines (a narrow fs.read of that range) and copy from that fresh view — paging after your whole-file read does NOT revoke editing. If an edit still fails "not found", the error prints the CLOSEST actual text in the file — copy that verbatim; do not guess again.
+To INSERT a new test case or block, do NOT replace a whole block: set old_string to ONE short unique EXISTING line next to the insertion point, and new_string to that SAME line plus your added lines (above or below it). A single-line anchor is far more reliable than reproducing a multi-line block verbatim, which is where the model drifts.
+Investigate narrowly: read the unit under test and the existing tests in that package, grep for the symbol if you must, then write the test. Do not wander through unrelated files.
+Ground unfamiliar APIs: before you reference a Go function, type, method, or field you are not certain of — especially an internal one — resolve its REAL signature with sys.go_doc (params.symbol, e.g. "corpos/internal/tool.Spec" or "session.Create"). Never guess an internal signature; a guessed name or field is a non-compiling test that wastes the verify budget.
+Write a real assertion: the test must actually exercise the behavior and fail if it regresses — never a vacuous always-green test just to satisfy the gate.
+Stop when done: once your test compiles and passes, STOP. Do not keep adding cases or refactoring past the deliverable.
+If you cannot verify something, say so plainly and stop. An honest "unverified" is correct; a claimed success that isn't real is the worst outcome."""
+
+[[tools]]
+surface = "fs"
+actions = ["read", "write", "edit", "grep", "glob", "ls"]
+
+# No sys.exec: the worker does NOT self-run build/test (the organ gate does that after
+# declare-done). Granting exec only invited a risk-blocked `go test` thrash instead of
+# reliance on the auto-gate (run-2 rehearsal gap). go_doc stays (read-only API grounding).
+[[tools]]
+surface = "sys"
+actions = ["go_doc"]

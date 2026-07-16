@@ -1,0 +1,16 @@
+# Judgment worker: pre-build problem-shaping. Whole knowledge surface (vault +
+# kiwix + library + parse_context) for prior-art retrieval, plus read. Weighs
+# competing approaches toward a conditional recommendation.
+name = "design"
+duty = "shape a problem before building: retrieve prior art, weigh approaches"
+signals = ["design", "architect", "approach", "blueprint", "rfc"]
+tier = "mid" # default-capped at mid (2026-06-03 directive); design is the likeliest justified strong upgrade, but prove the need first
+skills = ["writing-plans", "vault-pull-discipline", "codebase-inspection", "ml-opportunity-scan"]
+context_shapes = ["vault_note", "library", "kiwix"]
+
+[[tools]]
+surface = "knowledge"
+
+[[tools]]
+surface = "fs"
+actions = ["read", "grep", "glob", "ls"]

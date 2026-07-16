@@ -1,0 +1,18 @@
+# Mechanical worker: commit, run the repo gate, push. Needs sys.exec (git + the
+# gate) — the asymmetry that keeps sys per-profile, not a global drop (§4.4.1).
+# UNVALIDATED: blocked end-to-end by the non-functional exec substrate (§7 gap #6)
+# until the toolkit-server image has a shell. The gate it runs MUST be
+# orchestrator-owned + immutable (risk-gating, §4.1.1) — not settled in this profile.
+name = "git-process"
+duty = "commit, run the repo gate, and push a change (exec substrate pending gap #6)"
+signals = ["commit", "push", "git"]
+tier = "local"
+context_shapes = ["path"]
+
+[[tools]]
+surface = "sys"
+actions = ["exec"]
+
+[[tools]]
+surface = "fs"
+actions = ["read"]

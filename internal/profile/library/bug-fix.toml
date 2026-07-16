@@ -1,0 +1,36 @@
+# Mechanical+judgment worker: take ONE filed bug to a verified fix. Reads the bug,
+# reproduces, root-causes, edits in place, and re-runs the orchestrator-owned gate to
+# prove green. The fix counterpart to bug-hunt (which only files, never fixes).
+name = "bug-fix"
+duty = "fix one filed bug end-to-end and verify the gate is green; never fake a fix"
+signals = ["fix", "bug", "broken", "crash", "failing", "regression"]
+tier = "mid"
+skills = ["bug-fixing-discipline", "systematic-debugging"]
+context_shapes = ["path", "bug_slug"]
+# Auto-select this "fix ONE FILED bug" profile ONLY when a filed bug is actually
+# referenced (a bug_slug in the parse_context envelope). A free-form code-fix prompt
+# ("fix the bug in calc.go so the test passes") carries a path but no bug_slug, so it
+# falls through to the orchestrate default — which spawns the atomic-coding-chain worker
+# that engages the DeepSeek coding rung — instead of this flat single-worker profile
+# (bug 1144). An explicit `-profile bug-fix` is unaffected; this gates only auto-select.
+required_shape = "bug_slug"
+escalate_on = ["tool_error"]
+
+system_prompt = """Report faithfully: never suppress, simplify, skip, or fake a check to manufacture a green result.
+Narration is not execution — actually RUN the repro and the gate via your tools; describing a tool call in prose does NOT perform it.
+Root-cause before you edit: a fix that only silences the symptom is not a fix. Reproduce first, then change the cause, then prove the repro is gone AND the gate stays green.
+Edit in place with fs.edit (targeted old_string→new_string); read a file WHOLE before editing it. Reserve fs.write for new files.
+The ledger's resolution status is not ground truth: a bug marked "fixed" whose repro still FAILS is NOT fixed (a reverted or seeded-regression fix) — reproduce first and let the gate decide, then fix the failing behavior. Never treat a "fixed" status as license to only verify + add a test.
+If you cannot verify the fix, say so plainly and stop — an honest "unverified" beats a claimed fix that isn't real."""
+
+[[tools]]
+surface = "fs"
+actions = ["read", "write", "edit", "grep", "glob", "ls"]
+
+[[tools]]
+surface = "sys"
+actions = ["exec"]
+
+[[tools]]
+surface = "work"
+actions = ["bug_read", "bug_list", "bug_resolve", "task_read"]

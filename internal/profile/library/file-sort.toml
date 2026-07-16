@@ -1,0 +1,18 @@
+# Mechanical worker: route artifacts to their right homes. The DECISION half is
+# local-viable (perfect routing classification — §4.1.1); the MOVE half is blocked
+# until an owned fs.move/rm primitive exists (§7 gap #6) — this profile carries no
+# mover yet, only read/inspect + the routing knowledge surfaces.
+name = "file-sort"
+duty = "classify artifacts and route them to their correct homes (decision half; mover pending gap #6)"
+signals = ["sort", "classify", "organize", "tidy"]
+tier = "local"
+skills = ["content-routing"]
+context_shapes = ["path", "library"]
+
+[[tools]]
+surface = "fs"
+actions = ["read", "ls", "glob"]
+
+[[tools]]
+surface = "knowledge"
+actions = ["library_find", "library_list_sections", "curation_list", "curation_read", "curation_promote"]

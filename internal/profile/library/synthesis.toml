@@ -1,0 +1,16 @@
+# Judgment worker: cross-session pattern synthesis / retro. Vault read surfaces +
+# read; consults vault prior craft first and traces each pattern to >=2 inputs.
+# No write surface — synthesis output is the deliverable.
+name = "synthesis"
+duty = "synthesize cross-session patterns and retros from the vault corpus"
+signals = ["synthesize", "synthesis", "patterns", "retrospective"]
+tier = "mid" # default-capped at mid (2026-06-03 directive); tune to strong only if mid proves insufficient on real synthesis work
+context_shapes = ["vault_note"]
+
+[[tools]]
+surface = "knowledge"
+actions = ["vault_search", "vault_read", "knowledge_search"]
+
+[[tools]]
+surface = "fs"
+actions = ["read", "grep", "glob", "ls"]

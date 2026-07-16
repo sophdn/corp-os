@@ -1,0 +1,26 @@
+$ corpos ... -risk-gate enforce -prompt "fix the failing test in ./calc ..."
+
+corpos: auto-selected "bug-fix" (score 4): signals=[fix bug] shapes=[]
+corpos: profile "bug-fix" (tier mid) — projected 3 of 6 surfaces
+corpos: model ladder OVERRIDDEN by flags — the canonical (benchmarked) ladder is Qwen2.5-32B-Instruct-Q4_K_M.gguf → google/gemini-3.1-flash-lite → claude-opus-4-8
+corpos: session 01KWJ6KFR3387DBQ092M8AF7DT (resume with -resume 01KWJ6KFR3387DBQ092M8AF7DT)
+corpos: context compaction on by default — budget 124000 tok, fidelity extreme (model window 1000000, tool-spec overhead ~627)
+corpos: model ladder — Qwen2.5-32B-Instruct-Q4_K_M.gguf → google/gemini-3.1-flash-lite → claude-opus-4-8; floor=google/gemini-3.1-flash-lite; escalation: full contract (repeated_tool_error after 1); opus bounded to 2 turn(s)
+  [tool fs.ls -> ok]
+  [tool fs.ls -> ok]
+  [tool sys.exec -> tool_error]        # go test BLOCKED by -risk-gate enforce
+  [tool fs.read -> ok]
+  [tool fs.read -> ok]
+  [tool fs.edit -> ok]                 # the correct fix (a+b) is written to calc.go
+corpos: circuit-breaker: strong-bound reached — the frontier (claude-opus-4-8) served its 2 bounded turn(s) with the task still stuck; halting rather than spending unbounded frontier on a run the floor can't finish, no final answer
+
+corpos: session cost $0.0464
+  claude-opus-4-8: 6803 in + 419 out tok → $0.0445 [priced: table]
+  google/gemini-3.1-flash-lite: 6834 in + 101 out tok → $0.0019 [priced: provider]
+  opus bound: 2/2 turn(s) used, 0 escalation(s) blocked
+
+# NOTE: The edit was correct (calc.go became `return a + b`), but because
+# -risk-gate enforce blocked `go test`, corpos could NOT verify a red->green and
+# refused to declare success. It halted with "no final answer" rather than
+# claiming a green it never observed. That refusal is the anti-fake-green
+# machinery doing its job — "done" must be an observed, verified fact.
